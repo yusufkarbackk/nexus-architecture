@@ -1,0 +1,9 @@
+[submodule "nexus-core"]
+	path = nexus-core
+	url = https://github.com/yusufkarbackk/nexus_core.git
+[submodule "nexus-agent"]
+	path = nexus-agent
+	url = https://github.com/yusufkarbackk/nexus-agent.git
+[submodule "nexus_ui"]
+	path = nexus_ui
+	url = https://github.com/yusufkarbackk/nexus_ui.git

@@ -1,0 +1,114 @@
+# ============================================
+# Nexus Docker Compose - Application Server
+# ============================================
+# This runs on the application server.
+# MySQL and Redis run on the storage server.
+
+services:
+  # ----------------------
+  # Go API Server
+  # ----------------------
+  nexus-api:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+    env_file:
+      - ./nexus-core/.env
+    volumes:
+      - ./nexus-core/.env:/app/.env:ro
+      - ./nexus-core/config.yml:/app/config.yml:ro
+    command: ["./nexus-api"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nexus-network
+
+  # ----------------------
+  # Go Worker (Background Jobs)
+  # ----------------------
+  nexus-worker:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-worker
+    restart: unless-stopped
+    env_file:
+      - ./nexus-core/.env
+    volumes:
+      - ./nexus-core/.env:/app/.env:ro
+      - ./nexus-core/config.yml:/app/config.yml:ro
+    command: ["./nexus-worker"]
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-network
+
+  # ----------------------
+  # Go MQTT Service (IoT Data Ingestion)
+  # ----------------------
+  nexus-mqtt:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-mqtt
+    restart: unless-stopped
+    env_file:
+      - ./nexus-core/.env
+    volumes:
+      - ./nexus-core/.env:/app/.env:ro
+      - ./nexus-core/config.yml:/app/config.yml:ro
+    command: ["./nexus-mqtt"]
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-network
+
+  # ----------------------
+  # Next.js UI
+  # ----------------------
+  nexus-ui:
+    build:
+      context: ./nexus_ui
+      dockerfile: Dockerfile
+    container_name: nexus-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://nexus-api:8080
+    env_file:
+      - ./nexus_ui/.env.production
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-network
+
+  # ----------------------
+  # Nginx Reverse Proxy
+  # ----------------------
+  nginx:
+    image: nginx:alpine
+    container_name: nexus-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - nexus-api
+      - nexus-ui
+    networks:
+      - nexus-network
+
+networks:
+  nexus-network:
+    driver: bridge

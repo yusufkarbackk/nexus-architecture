@@ -1,0 +1,132 @@
+# ============================================
+# Nexus Docker Compose - LOCAL DEVELOPMENT
+# ============================================
+# Uses your existing MySQL and Redis containers on nexus-infra_default network
+# Run: docker-compose -f docker-compose.local.yml up --build
+
+services:
+  # ----------------------
+  # Go API Server
+  # ----------------------
+  nexus-api:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=debug
+      - NEXUS_DB_HOST=nexus_mysql_local
+      - NEXUS_DB_PORT=3309
+      - NEXUS_DB_USER=demo_user
+      - NEXUS_DB_PASSWORD=demo_password
+      - NEXUS_DB_NAME=nexus_db
+      - NEXUS_REDIS_HOST=nexus_redis_local
+      - NEXUS_REDIS_PORT=6379
+      - NEXUS_JWT_SECRET=aFLRSts0IHF+HDxCaG1hilb8X4taNy5zw33+5XDRyVk=
+      - NEXUS_ENCRYPTION_KEY=EzSFzK4//Si+Jc+7s5DQ4QXW2ByUbnHxw6EKKmLWIRU=
+    volumes:
+      - ./nexus-core/config.local.yml:/app/config.yml:ro
+      - ./nexus-core/.env.docker:/app/.env:ro
+    command: ["./nexus-api"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nexus-infra_default
+
+  # ----------------------
+  # Go Worker (Background Jobs)
+  # ----------------------
+  nexus-worker:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-worker
+    restart: unless-stopped
+    environment:
+      - NEXUS_DB_HOST=nexus_mysql_local
+      - NEXUS_DB_PORT=3309
+      - NEXUS_DB_USER=demo_user
+      - NEXUS_DB_PASSWORD=demo_password
+      - NEXUS_DB_NAME=nexus_db
+      - NEXUS_REDIS_HOST=nexus_redis_local
+      - NEXUS_REDIS_PORT=6381
+      - NEXUS_ENCRYPTION_KEY=EzSFzK4//Si+Jc+7s5DQ4QXW2ByUbnHxw6EKKmLWIRU=
+    volumes:
+      - ./nexus-core/config.local.yml:/app/config.yml:ro
+      - ./nexus-core/.env.docker:/app/.env:ro
+    command: ["./nexus-worker"]
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-infra_default
+
+  # ----------------------
+  # Go MQTT Service (IoT Data Ingestion)
+  # ----------------------
+  nexus-mqtt:
+    build:
+      context: ./nexus-core
+      dockerfile: Dockerfile
+    container_name: nexus-mqtt
+    restart: unless-stopped
+    environment:
+      - NEXUS_DB_HOST=nexus_mysql_local
+      - NEXUS_DB_PORT=3309                                                                                                                                                  
+      - NEXUS_DB_USER=demo_user
+      - NEXUS_DB_PASSWORD=demo_password
+      - NEXUS_DB_NAME=nexus_db
+      - NEXUS_REDIS_HOST=nexus_redis_local
+      - NEXUS_REDIS_PORT=6381
+    volumes:
+      - ./nexus-core/config.local.yml:/app/config.yml:ro
+      - ./nexus-core/.env.docker:/app/.env:ro
+    command: ["./nexus-mqtt"]
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-infra_default
+
+  # ----------------------
+  # Next.js UI
+  # ----------------------
+  nexus-ui:
+    build:
+      context: ./nexus_ui
+      dockerfile: Dockerfile
+    container_name: nexus-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-infra_default
+
+  # ----------------------
+  # Nginx Reverse Proxy
+  # ----------------------
+  nginx:
+    image: nginx:alpine
+    container_name: nexus-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - nexus-api
+      - nexus-ui
+    networks:
+      - nexus-infra_default
+
+networks:
+  nexus-infra_default:
+    external: true

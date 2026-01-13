@@ -1,0 +1,96 @@
+name: Release Agent
+
+on:
+  push:
+    tags:
+      - 'agent-v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/agent-}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        working-directory: ./nexus-agent
+        run: |
+          mkdir -p dist
+          
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/nexus-agent-linux-amd64 ./cmd/agent
+          
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/nexus-agent-linux-arm64 ./cmd/agent
+          
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/nexus-agent-windows-amd64.exe ./cmd/agent
+          
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/nexus-agent-darwin-amd64 ./cmd/agent
+          
+          # macOS ARM64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o dist/nexus-agent-darwin-arm64 ./cmd/agent
+          
+          # Generate checksums
+          cd dist && sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Nexus Agent ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Nexus Agent ${{ steps.version.outputs.VERSION }}
+            
+            ### Download
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
+            | Linux | AMD64 | `nexus-agent-linux-amd64` |
+            | Linux | ARM64 | `nexus-agent-linux-arm64` |
+            | Windows | AMD64 | `nexus-agent-windows-amd64.exe` |
+            | macOS | AMD64 | `nexus-agent-darwin-amd64` |
+            | macOS | ARM64 | `nexus-agent-darwin-arm64` |
+            
+            ### Quick Install (Linux)
+            ```bash
+            # Download
+            wget https://github.com/${{ github.repository }}/releases/download/agent-${{ steps.version.outputs.VERSION }}/nexus-agent-linux-amd64
+            
+            # Make executable
+            chmod +x nexus-agent-linux-amd64
+            
+            # Move to path
+            sudo mv nexus-agent-linux-amd64 /usr/local/bin/nexus-agent
+            
+            # Create config
+            nexus-agent --generate-config > config.yml
+            
+            # Run
+            nexus-agent -config config.yml
+            ```
+          files: |
+            nexus-agent/dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

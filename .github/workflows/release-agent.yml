@@ -87,11 +87,73 @@ jobs:
             # Move to path
             sudo mv nexus-agent-linux-amd64 /usr/local/bin/nexus-agent
             
-            # Create config
-            nexus-agent --generate-config > config.yml
+            # Create config directory
+            sudo mkdir -p /etc/nexus-agent
+            
+            # Create config file (see below)
+            sudo nano /etc/nexus-agent/config.yml
             
             # Run
-            nexus-agent -config config.yml
+            nexus-agent -config /etc/nexus-agent/config.yml
+            ```
+            
+            ### Configuration (config.yml)
+            
+            Create `/etc/nexus-agent/config.yml` with the following content:
+            
+            ```yaml
+            agent:
+              port: 9000
+              bind: "0.0.0.0"
+            
+            nexus:
+              # Your Nexus server URL
+              server_url: "https://nexus.yourcompany.com"
+              
+              # Agent token from Nexus UI (Agents > Create Agent)
+              agent_token: "agt_YOUR_TOKEN_HERE"
+              
+              # Sync interval for fetching app configurations
+              sync_interval: 60s
+              timeout: 30s
+              retry_attempts: 3
+              retry_delay: 5s
+            
+            buffer:
+              enabled: true
+              max_size: 10000
+              db_path: "/var/lib/nexus/queue.db"
+            ```
+            
+            **Important:** Replace `server_url` and `agent_token` with your actual values.
+            
+            ### Run as Systemd Service
+            
+            ```bash
+            sudo tee /etc/systemd/system/nexus-agent.service << 'EOF'
+            [Unit]
+            Description=Nexus Agent
+            After=network.target
+            
+            [Service]
+            Type=simple
+            ExecStart=/usr/local/bin/nexus-agent -config /etc/nexus-agent/config.yml
+            Restart=always
+            RestartSec=5
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+            
+            sudo systemctl daemon-reload
+            sudo systemctl enable nexus-agent
+            sudo systemctl start nexus-agent
+            ```
+            
+            ### Test Connection
+            
+            ```bash
+            curl http://localhost:9000/health
             ```
           files: |
             nexus-agent/dist/*

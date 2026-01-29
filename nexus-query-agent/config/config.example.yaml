@@ -1,0 +1,41 @@
+# ============================================
+# Nexus Query Agent Configuration
+# ============================================
+# Copy to config.yaml and fill in your values
+
+agent:
+  id: "query-agent-001"
+  name: "SAP Query Agent"
+  token: "your_agent_token_here"
+
+nexus:
+  core_url: "ws://localhost:8080/ws/query-agent"
+  reconnect_interval: "5s"
+  heartbeat_interval: "30s"
+
+datasources:
+  - id: "sap-production"
+    type: "sap"
+    name: "SAP HANA Production"
+    host: "sap-hana.internal"
+    port: 30015
+    username: "SAPUSER"
+    password: "your_password"
+    
+  # - id: "mysql-reporting"
+  #   type: "mysql"
+  #   name: "MySQL Reporting"
+  #   host: "mysql.internal"
+  #   port: 3306
+  #   database: "reporting"
+  #   username: "reader"
+  #   password: "your_password"
+
+limits:
+  max_rows: 100000
+  query_timeout: "10m"
+  max_concurrent_queries: 10
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json" # json, text

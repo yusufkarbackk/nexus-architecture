@@ -67,6 +67,22 @@ services:
       - nexus-infra_default
 
   # ----------------------
+  # Query Agent (SAP HANA connector)
+  # ----------------------
+  nexus-query-agent:
+    build:
+      context: ./nexus-query-agent
+      dockerfile: Dockerfile
+    container_name: nexus-query-agent
+    restart: unless-stopped
+    volumes:
+      - ./nexus-query-agent/config/config.docker.yml:/app/config/config.yml:ro
+    depends_on:
+      - nexus-api
+    networks:
+      - nexus-infra_default
+
+  # ----------------------
   # Go MQTT Service (IoT Data Ingestion)
   # ----------------------
   nexus-mqtt:

@@ -1,0 +1,27 @@
+# ============================================
+# Nexus Query Agent Configuration - Docker
+# ============================================
+
+agent:
+  id: "query-agent-docker"
+  name: "SAP Query Agent (Docker)"
+  token: "agt_25ef1597f996b55041fcab9dab603104e957a1d5ef8b06fe"
+
+nexus:
+  # Connect to nexus-api container via Docker network
+  core_url: "ws://nexus-api:8080/ws/query-agent"
+  reconnect_interval: "5s"
+  heartbeat_interval: "30s"
+
+# Note: Datasources are NOT configured here!
+# They are managed centrally in Nexus UI (SAP Destinations page)
+# The agent will receive connection details per-query from Nexus Core
+
+limits:
+  max_rows: 100000
+  query_timeout: "10m"
+  max_concurrent_queries: 10
+
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json" # json, text

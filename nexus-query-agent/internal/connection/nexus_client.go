@@ -36,10 +36,20 @@ func NewNexusClient(cfg *config.Config) *NexusClient {
 func (c *NexusClient) Connect() error {
 	log.Printf("INFO: Connecting to Nexus Core at %s", c.config.Nexus.CoreURL)
 
-	conn, _, err := websocket.DefaultDialer.Dial(c.config.Nexus.CoreURL, nil)
+	// Create dialer with larger buffer sizes for large data transfers
+	dialer := websocket.Dialer{
+		ReadBufferSize:   10 * 1024 * 1024, // 10 MB for receiving large query requests
+		WriteBufferSize:  10 * 1024 * 1024, // 10 MB for sending large query results
+		HandshakeTimeout: 30 * time.Second,
+	}
+
+	conn, _, err := dialer.Dial(c.config.Nexus.CoreURL, nil)
 	if err != nil {
 		return err
 	}
+
+	// Set connection settings for large messages
+	conn.SetReadLimit(50 * 1024 * 1024) // 50 MB max message size
 
 	c.mu.Lock()
 	c.conn = conn

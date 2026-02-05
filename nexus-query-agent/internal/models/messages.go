@@ -63,7 +63,9 @@ type QueryRequest struct {
 	Type       MessageType    `json:"type"`
 	RequestID  string         `json:"request_id"`
 	Datasource DatasourceInfo `json:"datasource"` // Connection details from Nexus
+	QueryType  string         `json:"query_type"` // "select", "insert", "update", "delete"
 	Query      string         `json:"query"`
+	Params     []any          `json:"params,omitempty"` // For parameterized queries
 	Page       int            `json:"page"`
 	Limit      int            `json:"limit"`
 }
@@ -73,9 +75,11 @@ type QueryResult struct {
 	Type            MessageType      `json:"type"`
 	RequestID       string           `json:"request_id"`
 	Success         bool             `json:"success"`
+	QueryType       string           `json:"query_type,omitempty"` // "select", "insert", "update", "delete"
 	Data            []map[string]any `json:"data,omitempty"`
 	Columns         []ColumnInfo     `json:"columns,omitempty"`
 	Pagination      *Pagination      `json:"pagination,omitempty"`
+	AffectedRows    int64            `json:"affected_rows,omitempty"` // For DML operations
 	ExecutionTimeMs int64            `json:"execution_time_ms"`
 	Error           string           `json:"error,omitempty"`
 }

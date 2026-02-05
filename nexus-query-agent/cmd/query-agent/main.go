@@ -62,8 +62,8 @@ func main() {
 
 // handleQueryRequest processes incoming query requests with dynamic connections
 func handleQueryRequest(client *connection.NexusClient, cfg *config.Config, req *models.QueryRequest) {
-	log.Printf("INFO: Processing query request %s for datasource %s:%d",
-		req.RequestID, req.Datasource.Host, req.Datasource.Port)
+	log.Printf("INFO: Processing %s request %s for datasource %s:%d",
+		req.QueryType, req.RequestID, req.Datasource.Host, req.Datasource.Port)
 
 	// Create executor based on datasource type
 	exec, err := executor.NewExecutor(req.Datasource.Type, &cfg.Limits)
@@ -72,8 +72,31 @@ func handleQueryRequest(client *connection.NexusClient, cfg *config.Config, req 
 		return
 	}
 
-	// Execute query using datasource info from request (not local config)
-	result, err := exec.Execute(&req.Datasource, req.Query, req.Page, req.Limit)
+	var result *models.QueryResult
+
+	// Route based on query type
+	queryType := req.QueryType
+	if queryType == "" {
+		queryType = "select" // Default to SELECT for backward compatibility
+	}
+
+	switch queryType {
+	case "select":
+		// Execute SELECT query with pagination
+		result, err = exec.Execute(&req.Datasource, req.Query, req.Page, req.Limit)
+	case "insert", "update", "delete":
+		// Execute DML with transaction handling
+		if sapExec, ok := exec.(*executor.SapExecutor); ok {
+			result, err = sapExec.ExecuteDML(&req.Datasource, queryType, req.Query, req.Params)
+		} else {
+			client.SendError(req.RequestID, "DML_NOT_SUPPORTED", "DML operations only supported for SAP datasources")
+			return
+		}
+	default:
+		client.SendError(req.RequestID, "INVALID_QUERY_TYPE", "Query type must be: select, insert, update, or delete")
+		return
+	}
+
 	if err != nil {
 		client.SendError(req.RequestID, "EXECUTION_ERROR", err.Error())
 		return
@@ -87,6 +110,12 @@ func handleQueryRequest(client *connection.NexusClient, cfg *config.Config, req 
 		return
 	}
 
-	log.Printf("INFO: Query %s completed in %dms, %d rows returned",
-		req.RequestID, result.ExecutionTimeMs, len(result.Data))
+	// Log appropriate message based on query type
+	if queryType == "select" {
+		log.Printf("INFO: Query %s completed in %dms, %d rows returned",
+			req.RequestID, result.ExecutionTimeMs, len(result.Data))
+	} else {
+		log.Printf("INFO: %s %s completed in %dms, %d rows affected",
+			queryType, req.RequestID, result.ExecutionTimeMs, result.AffectedRows)
+	}
 }
